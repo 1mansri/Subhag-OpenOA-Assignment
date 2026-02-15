@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export function SiteHeader() {
     return (
-        <header className="bg-background sticky top-0 z-50 flex w-full items-center border-b">
+        <header className="bg-background rounded-t-lg sticky top-0 z-50 flex w-full items-center border-b">
             <div className="flex h-14 w-full items-center gap-2 px-4 lg:px-6">
                 <SidebarTrigger className="-ml-1" />
                 <Separator

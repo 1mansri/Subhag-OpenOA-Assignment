@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "OpenOA Cloud — AEP Analysis Dashboard",
+  title: "OpenOA Analysis Dashboard",
   description:
     "Monte Carlo Annual Energy Production analysis powered by the OpenOA Python library. Analyze wind farm performance with real SCADA data.",
 }
@@ -30,6 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <meta name="apple-mobile-web-app-title" content="OpenOA Analysis Dashboard" />
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >

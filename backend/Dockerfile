@@ -35,8 +35,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy the OpenOA repo (data + examples scripts only — no .git)
 COPY --from=builder /app/OpenOA_Repo/examples /app/OpenOA_Repo/examples
 COPY --from=builder /app/OpenOA_Repo/openoa /app/OpenOA_Repo/openoa
-COPY --from=builder /app/OpenOA_Repo/setup.py /app/OpenOA_Repo/setup.py
-COPY --from=builder /app/OpenOA_Repo/setup.cfg /app/OpenOA_Repo/setup.cfg
+COPY --from=builder /app/OpenOA_Repo/pyproject.toml /app/OpenOA_Repo/pyproject.toml
 
 # Copy our application code
 COPY main.py .

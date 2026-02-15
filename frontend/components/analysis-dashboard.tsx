@@ -156,7 +156,7 @@ export function AnalysisDashboard() {
                 {/* Results — Tabbed Chart Views */}
                 {data && !loading && (
                     <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-500 px-4 lg:px-6">
-                        <Tabs defaultValue="overview" className="space-y-4">
+                        <Tabs defaultValue="power-curve" className="space-y-4">
                             <TabsList>
                                 <TabsTrigger value="overview">Overview</TabsTrigger>
                                 <TabsTrigger value="power-curve">Power Curve</TabsTrigger>

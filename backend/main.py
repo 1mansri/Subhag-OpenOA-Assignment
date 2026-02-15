@@ -4,6 +4,7 @@ import io
 import math
 import base64
 import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -200,28 +201,105 @@ def build_chart_data_from_plant(plant, analysis, aep_val):
     monthly_production = []
     try:
         scada = plant.scada.copy()
-        time_col = None
+
+        # Find the energy/power column
         energy_col = None
         for c in scada.columns:
             cl = str(c).lower()
-            if "time" in cl or "date" in cl:
-                time_col = c
             if "energy" in cl:
                 energy_col = c
+                break
             if "p_avg" in cl or "wtur_w" in cl:
-                if energy_col is None:
-                    energy_col = c
+                energy_col = c
 
-        if time_col and energy_col:
-            scada["_month"] = scada[time_col].dt.month
+        if energy_col:
+            print(f"   Using Energy Column: {energy_col}")
+            print(f"   SCADA Columns: {scada.columns.tolist()}")
+            print(f"   SCADA Index type: {type(scada.index)}")
+            
+            # --- DATE PARSING STRATEGY ---
+            # 1. Try to find a specific datetime column
+            dt_col = None
+            # Explicitly check for Date_time first as project_ENGIE uses it
+            if "Date_time" in scada.columns:
+                dt_col = "Date_time"
+            else:
+                for c in scada.columns:
+                    cl = str(c).lower().strip()
+                    if cl in ["date_time", "time", "timestamp", "datetime", "date"]:
+                        dt_col = c
+                        break
+            
+            if dt_col:
+                print(f"   Found Datetime Column: {dt_col}")
+                # Use the column
+                scada["_dt"] = pd.to_datetime(scada[dt_col], utc=True).dt.tz_localize(None)
+            else:
+                print("   ⚠️ No Datetime Column Found. Falling back to index.")
+                 # Fallback to index
+                if scada.index.nlevels > 1:
+                    print("   SCADA has MultiIndex")
+                    try:
+                        # Try to find level with datetime
+                        for i in range(scada.index.nlevels):
+                            level_values = scada.index.get_level_values(i)
+                            if pd.api.types.is_datetime64_any_dtype(level_values) or (len(level_values) > 0 and isinstance(level_values[0], (pd.Timestamp, str))):
+                                dt_vals = level_values
+                                print(f"   Using Index Level {i}")
+                                break
+                        else:
+                             dt_vals = scada.index.get_level_values(-1)
+                    except IndexError:
+                        dt_vals = scada.index
+                else:
+                    print("   SCADA has Single Index")
+                    dt_vals = scada.index
+                
+                # Convert index values to datetime
+                scada["_dt"] = pd.to_datetime(dt_vals, utc=True, errors='coerce').tz_localize(None)
+
+            # Drop rows where datetime parsing failed
+            # Debug pre-dropna
+            print(f"   Rows before dropna: {len(scada)}")
+            scada = scada.dropna(subset=["_dt"])
+            print(f"   Rows after dropna: {len(scada)}")
+            
+            if len(scada) == 0:
+                print("   ❌ Error: Date parsing resulted in empty dataframe. Checking first few index values:")
+                print(f"   First 5 index values: {dt_vals[:5] if 'dt_vals' in locals() else 'N/A'}")
+
+            scada["_month"] = scada["_dt"].dt.month
+
             months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            
+            # Group by month and sum energy
             monthly = scada.groupby("_month")[energy_col].sum().reset_index()
+            
+            print(f"   Monthly Production Data Points: {len(monthly)}")
+
             for _, row in monthly.iterrows():
                 m_idx = int(row["_month"]) - 1
                 if 0 <= m_idx < 12:
-                    actual = round(float(row[energy_col]) / 1e6, 2)  # kWh -> GWh
-                    expected = round(actual * float(np.random.uniform(1.0, 1.12)), 2)
+                    # Convert to GWh (assuming input is kWh based on project_ENGIE.py or standard)
+                    # If column name suggests MW/kW, adjust accordingly. 
+                    # standard OpenOA SCADA `energy_kwh` suggests kWh.
+                    val = float(row[energy_col])
+                    if "kwh" in str(energy_col).lower():
+                        actual = round(val / 1e6, 3) # kWh -> GWh
+                    elif "mwh" in str(energy_col).lower():
+                        actual = round(val / 1e3, 3) # MWh -> GWh
+                    elif "wh" in str(energy_col).lower():
+                        actual = round(val / 1e9, 3) # Wh -> GWh
+                    else:
+                        # Assume kWh if unknown, common in SCADA
+                        actual = round(val / 1e6, 3)
+
+                    # Simulated "expected" for specific months if not in data, or just use a ratio
+                    # In a real app, this would come from a budget or model.
+                    # We'll just differentiate it slightly from actual for visualization.
+                    expected = round(actual * 1.05, 3)
+                    
                     monthly_production.append({
                         "month": months[m_idx],
                         "expected_gwh": expected,
@@ -229,6 +307,8 @@ def build_chart_data_from_plant(plant, analysis, aep_val):
                     })
     except Exception as e:
         print(f"⚠️ Monthly production extraction failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     # --- AEP Distribution from Monte Carlo results ---
     aep_distribution = []
@@ -246,29 +326,77 @@ def build_chart_data_from_plant(plant, analysis, aep_val):
     except Exception as e:
         print(f"⚠️ AEP distribution extraction failed: {e}")
 
-    # --- Turbine Comparison from Asset data ---
+        # --- Turbine Comparison from Asset data ---
     turbine_data = []
     try:
+        # Determine which level of the index corresponds to turbine IDs
+        turbine_level = None
+        if plant.scada.index.nlevels > 1:
+            for i in range(plant.scada.index.nlevels):
+                # Check if values in this level overlap with asset index
+                unique_vals = plant.scada.index.get_level_values(i).unique()
+                if len(set(unique_vals) & set(plant.asset.index)) > 0:
+                     turbine_level = i
+                     print(f"   Found Turbine ID at Index Level {i}")
+                     break
+        
         for t_id in plant.asset.index:
-            scada_t = plant.scada.loc[plant.scada.index.get_level_values(0) == t_id] if plant.scada.index.nlevels > 1 else plant.scada
+            try:
+                if turbine_level is not None:
+                     scada_t = plant.scada.xs(t_id, level=turbine_level, drop_level=False)
+                else:
+                    # Single index, assume it's NOT multi-turbine if we can't find ID level?
+                    # Or maybe the column has the ID?
+                    if "Wind_turbine_name" in plant.scada.columns:
+                        scada_t = plant.scada[plant.scada["Wind_turbine_name"] == t_id]
+                    else:
+                        # Fallback: use entire SCADA if we can't distinguish (risky for multi-turbine)
+                        scada_t = plant.scada
+            except Exception as e:
+                print(f"   ⚠️ Could not slice SCADA for turbine {t_id}: {e}")
+                continue
+
             capacity_mw = 2.05
             try:
-                capacity_mw = float(plant.asset.loc[t_id, "rated_power"])
+                if "rated_power" in plant.asset.columns:
+                    val = float(plant.asset.loc[t_id, "rated_power"])
+                    # Heuristic: if > 10, likely kW (e.g. 2050), not MW.
+                    if val > 10:
+                        capacity_mw = val / 1000.0
+                    else:
+                        capacity_mw = val
             except Exception:
                 pass
+            
             mean_power = 0
-            try:
-                for c in scada_t.columns:
-                    if "p_avg" in str(c).lower() or "wtur_w" in str(c).lower():
-                        mean_power = float(scada_t[c].mean())
-                        break
-            except Exception:
-                pass
-            cf = mean_power / (capacity_mw * 1000) if capacity_mw > 0 else 0.3
+            # Try to find power column
+            pw_col = None
+            for c in scada_t.columns:
+                cl = str(c).lower()
+                if "p_avg" in cl or "wtur_w" in cl or "power" in cl:
+                    pw_col = c
+                    break
+            
+            if pw_col:
+                mean_power = float(scada_t[pw_col].mean())
+
+            # Convert to Capacity Factor
+            # Unit check: if mean_power > 10000, assumes Watts. If < 5000, assumes kW.
+            # Capacity is in MW.
+            if mean_power > 10000:
+                # Watts -> MW
+                cf = mean_power / (capacity_mw * 1000 * 1000)
+            else:
+                # kW -> MW
+                cf = mean_power / (capacity_mw * 1000)
+            
+            cf = min(max(cf, 0), 1) if capacity_mw > 0 else 0
+
+
             turbine_data.append({
                 "turbine_id": str(t_id),
-                "capacity_factor": round(min(max(cf, 0), 1), 3),
-                "availability": round(float(np.random.uniform(0.92, 0.99)), 3),
+                "capacity_factor": round(cf, 3),
+                "availability": round(float(np.random.uniform(0.92, 0.99)), 3), # Placeholder or calculate from status
                 "annual_energy_mwh": round(cf * capacity_mw * 8760, 1),
             })
     except Exception as e:

@@ -129,8 +129,24 @@ docker stop subhag-backend subhag-frontend
 docker rm subhag-backend subhag-frontend
 ```
 
+### Viewing Logs
+
+If you run with `-d` (detached), you can view logs with:
+```bash
+docker logs -f subhag-backend
+```
+
+To run in the foreground (to see logs immediately):
+```bash
+# Backend
+docker run -p 8000:8000 --name subhag-backend subhag-backend
+
+# Frontend
+docker run -p 3000:3000 --name subhag-frontend subhag-frontend
+```
+
 > [!TIP]
-> The backend Docker image is large (~2 GB) because it clones the OpenOA repository, unzips sample data, and installs scientific Python dependencies (NumPy, Pandas, Matplotlib, etc.) during the build. The first build will take several minutes.
+> The backend Docker build installs large scientific Python dependencies (NumPy, Pandas, Matplotlib) and processes the dataset. The first build may take several minutes and result in a large image (~1.5 GB), but subsequent builds will be faster due to layer caching.
 
 ---
 
