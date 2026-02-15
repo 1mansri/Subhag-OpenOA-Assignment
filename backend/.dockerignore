@@ -1,0 +1,35 @@
+# Python bytecode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv
+.venv
+env
+
+# Environment files
+.env
+.env.*
+
+# Version control
+.git
+.gitignore
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cloned repos (built inside Docker)
+OpenOA_Repo
+
+# Misc
+README.md
+*.md

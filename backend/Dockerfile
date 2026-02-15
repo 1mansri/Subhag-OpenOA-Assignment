@@ -1,0 +1,47 @@
+# ── Stage 1: Build — Clone repo, extract data, install deps ──
+FROM python:3.10-slim AS builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Shallow clone (skip full git history — saves ~100 MB)
+RUN git clone --depth 1 https://github.com/NatLabRockies/OpenOA.git OpenOA_Repo
+
+# Extract dataset
+RUN unzip OpenOA_Repo/examples/data/la_haute_borne.zip \
+    -d OpenOA_Repo/examples/data/la_haute_borne/
+
+# Remove .git directory and the ZIP (no longer needed)
+RUN rm -rf OpenOA_Repo/.git \
+    OpenOA_Repo/examples/data/la_haute_borne.zip
+
+# Install OpenOA + example deps + server deps in one layer
+RUN pip install --no-cache-dir --default-timeout=1000 \
+    -e "./OpenOA_Repo[examples]" \
+    fastapi uvicorn
+
+# ── Stage 2: Runtime — Copy only what's needed ──
+FROM python:3.10-slim AS runner
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy the OpenOA repo (data + examples scripts only — no .git)
+COPY --from=builder /app/OpenOA_Repo/examples /app/OpenOA_Repo/examples
+COPY --from=builder /app/OpenOA_Repo/openoa /app/OpenOA_Repo/openoa
+COPY --from=builder /app/OpenOA_Repo/setup.py /app/OpenOA_Repo/setup.py
+COPY --from=builder /app/OpenOA_Repo/setup.cfg /app/OpenOA_Repo/setup.cfg
+
+# Copy our application code
+COPY main.py .
+COPY requirements.txt .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
