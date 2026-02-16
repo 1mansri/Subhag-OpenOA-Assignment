@@ -5,7 +5,7 @@ A full-stack application for wind energy analysis using the **OpenOA** (Open Ope
 | Layer    | Stack                                | Port   |
 | -------- | ------------------------------------ | ------ |
 | Frontend | Next.js 16, React 19, Recharts, pnpm | `3000` |
-| Backend  | FastAPI, Uvicorn, OpenOA, Matplotlib | `8000` |
+| Backend  | FastAPI, Uvicorn, OpenOA, Matplotlib | `10000` |
 
 ---
 
@@ -179,7 +179,7 @@ This backend is optimized to run on **Render's Free Tier** (512 MB RAM, < 1GB im
 6. Set the frontend's `NEXT_PUBLIC_API_URL` to the Render-provided URL.
 
 > [!NOTE]
-> The backend uses a **source-bundle approach** (patches OpenOA to skip heavy unused deps like bokeh/jupyter) to keep the image size under 800 MB. The analysis runs "live" (using `num_sim=5`) to stay within the 512 MB RAM limit.
+> **Disk vs RAM**: The ~1GB image size is stored on disk (not RAM). The runtime memory usage stays around **200–300 MB**, fitting comfortably within Render's 512 MB free-tier limit. The analysis uses `num_sim=5` to minimize memory spikes.
 
 
 

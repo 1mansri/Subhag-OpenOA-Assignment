@@ -1,41 +1,29 @@
-# ── Stage 1: Build — Clone repo, patch source, install only needed deps ──
+# ── Stage 1: Builder (Heavy Analysis) ──
 FROM python:3.10-slim AS builder
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git unzip && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends git unzip
 
 WORKDIR /app
 
-# Shallow clone (skip full git history)
+# Clone OpenOA repo (depth 1 to save space)
 RUN git clone --depth 1 https://github.com/NatLabRockies/OpenOA.git OpenOA_Repo
 
-# Extract dataset
-RUN unzip OpenOA_Repo/examples/data/la_haute_borne.zip \
-    -d OpenOA_Repo/examples/data/la_haute_borne/
+# Extract the example dataset
+WORKDIR /app/OpenOA_Repo/examples/data
+RUN unzip la_haute_borne.zip -d la_haute_borne && rm la_haute_borne.zip
 
-# Remove .git directory and the ZIP (no longer needed)
-RUN rm -rf OpenOA_Repo/.git \
-    OpenOA_Repo/examples/data/la_haute_borne.zip
+# Remove .git directory to save space
+WORKDIR /app
+RUN rm -rf OpenOA_Repo/.git
 
-# ── Patch OpenOA source to lazy-import unused heavy deps ──
-# This lets us skip installing bokeh (~80MB), IPython (~30MB), ipywidgets (~20MB), eia-python
+# Copy patching script
 COPY patch_openoa.py .
 RUN python patch_openoa.py OpenOA_Repo/openoa
 
-# ── Install dependencies ──
+# Install heavy dependencies needed for build-time analysis
+# We need numpy, pandas, scipy, sklearn, statsmodels, matplotlib, pygam, etc.
 WORKDIR /app
-
-# Install ONLY the dependencies actually used by our code paths
-# Core scientific stack (required by MonteCarloAEP and other analysis modules):
-#   numpy, pandas, scipy, scikit-learn, statsmodels, matplotlib, pygam, attrs, tqdm
-# Data/schema deps (required by PlantData):
-#   pyproj, shapely, tabulate, pytz, pyyaml
-# Server:
-#   fastapi, uvicorn, python-multipart
-#
-# EXCLUDED (patched out): bokeh, ipython, ipywidgets, eia-python
-# EXCLUDED (never needed): jupyterlab, xarray, netcdf4, h5py, h5pyd, cdsapi
 RUN pip install --no-cache-dir --default-timeout=1000 \
     "numpy>=1.24" \
     "pandas>=2.2,<3" \
@@ -50,38 +38,40 @@ RUN pip install --no-cache-dir --default-timeout=1000 \
     "shapely>=1.8" \
     "tabulate" \
     "pytz" \
-    "pyyaml" \
-    "fastapi" \
-    "uvicorn" \
-    "python-multipart"
+    "pyyaml"
 
+# Copy source code for analysis
+# We manually copy OpenOA source so it can be imported
+ENV PYTHONPATH=/app/OpenOA_Repo
+# Or rely on save_results.py adding it to path
 
+# Copy the analysis script
+COPY save_results.py .
 
-# ── Stage 2: Runtime — Copy only what's needed ──
+# Run the analysis to generate results.json
+# This might take a few minutes during build
+RUN python save_results.py
+
+# ── Stage 2: Runtime (Lightweight) ──
 FROM python:3.10-slim AS runner
 
 WORKDIR /app
 
-# Copy installed Python packages from builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Install ONLY the lightweight web server dependencies
+# No scientific libraries needed at runtime!
+RUN pip install --no-cache-dir \
+    "fastapi" \
+    "uvicorn" \
+    "python-multipart"
 
-# Copy the patched OpenOA source package directly (bypassing pip install)
-# This ensures we get the exact patched source without build issues
-COPY --from=builder /app/OpenOA_Repo/openoa /app/openoa
+# Copy the pre-computed results
+COPY --from=builder /app/results.json .
 
-# Copy the example data scripts and data
-COPY --from=builder /app/OpenOA_Repo/examples /app/OpenOA_Repo/examples
+# Copy the lightweight main script (renamed to main.py)
+COPY main_static.py main.py
 
-COPY --from=builder /app/OpenOA_Repo/pyproject.toml /app/OpenOA_Repo/pyproject.toml
-
-# Copy our application code
-COPY main.py .
-COPY requirements.txt .
-
-# Render uses port 10000 by default
-ENV PORT=10000
+# Expose port
 EXPOSE 10000
 
-# Trust Render proxy headers
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000} --forwarded-allow-ips '*'"]
+# Run the server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
