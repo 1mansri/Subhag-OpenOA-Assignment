@@ -37,8 +37,8 @@ A full-stack application for wind energy analysis using the **OpenOA** (Open Ope
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
-cd SUBHAG
+git clone https://github.com/1mansri/Subhag-OpenOA-Assignment
+cd Subhag-OpenOA-Assignment
 ```
 
 ### 2. Backend
@@ -62,10 +62,10 @@ pip install -r requirements.txt
 python setup_data.py
 
 # Start the server
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 10000 --reload
 ```
 
-The backend will be available at **http://localhost:8000**.
+The backend will be available at **http://localhost:10000**.
 
 > [!NOTE]
 > If OpenOA or its data is not available, the backend automatically falls back to **Simulation Mode** and generates synthetic results.
@@ -156,7 +156,7 @@ docker run -p 3000:3000 --name subhag-frontend subhag-frontend
 
 | Variable              | Default                  | Description                  |
 | --------------------- | ------------------------ | ---------------------------- |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000`  | Backend API base URL         |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:10000`  | Backend API base URL         |
 
 ### Backend
 
