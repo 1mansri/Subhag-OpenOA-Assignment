@@ -44,7 +44,7 @@ except ImportError:
 
 # --- Import the official ENGIE data loading script ---
 # The Dockerfile clones the OpenOA repo to /app/OpenOA_Repo
-OPENOA_REPO_PATH = "/app/OpenOA_Repo"
+OPENOA_REPO_PATH = os.path.join(os.path.dirname(__file__), "OpenOA_Repo")
 DATA_DIR = os.path.join(OPENOA_REPO_PATH, "examples", "data")
 DATA_PATH = os.path.join(DATA_DIR, "la_haute_borne")
 HAS_DATA = os.path.exists(DATA_PATH) and os.path.isdir(DATA_PATH)
