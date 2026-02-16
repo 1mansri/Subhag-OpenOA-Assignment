@@ -82,6 +82,28 @@ def main():
         except Exception as e:
             print(f"  ⚠️ Could not remove .git folder: {e}")
 
+    # ── Step 2.6: Remove heavy unused dependencies ────────────────
+    pyproject_path = os.path.join(REPO_DIR, "pyproject.toml")
+    if os.path.isfile(pyproject_path):
+        print(f"\n[2.6/3] Removing heavy dependencies from pyproject.toml...")
+        try:
+            with open(pyproject_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            
+            new_lines = []
+            removed_count = 0
+            for line in lines:
+                if "ipython" in line or "ipywidgets" in line:
+                    removed_count += 1
+                    continue
+                new_lines.append(line)
+            
+            with open(pyproject_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+            print(f"  ✓ Removed {removed_count} heavy dependencies (ipython, ipywidgets).")
+        except Exception as e:
+             print(f"  ⚠️ Could not modify pyproject.toml: {e}")
+
     # ── Step 3: Install OpenOA ────────────────────────────────
     print(f"\n[3/3] Installing OpenOA with example dependencies...")
     print("  (This may take a few minutes on first run)\n")
