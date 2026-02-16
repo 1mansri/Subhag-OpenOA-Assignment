@@ -18,7 +18,8 @@ export function StatusBadge() {
                 const res = await fetch(API_BASE, { cache: "no-store" })
                 if (!res.ok) throw new Error("Not OK")
                 const data: HealthResponse = await res.json()
-                setStatus(data.library_installed ? "connected" : "disconnected")
+                const isPreComputed = data.engine?.includes("Pre-computed") || data.status?.includes("Static Mode")
+                setStatus((data.library_installed || isPreComputed) ? "connected" : "disconnected")
             } catch {
                 setStatus("disconnected")
             }
