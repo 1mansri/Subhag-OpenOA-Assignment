@@ -19,8 +19,13 @@ RUN rm -rf OpenOA_Repo/.git \
     OpenOA_Repo/examples/data/la_haute_borne.zip
 
 # Install OpenOA + example deps + server deps in one layer
+# usage of -e is replaced by standard install to ensure files are in site-packages correctly
+WORKDIR /app/OpenOA_Repo
 RUN pip install --no-cache-dir --default-timeout=1000 \
-    -e "./OpenOA_Repo[examples]" \
+    ".[examples]" 
+
+WORKDIR /app
+RUN pip install --no-cache-dir --default-timeout=1000 \
     fastapi uvicorn
 
 # ── Stage 2: Runtime — Copy only what's needed ──
@@ -33,14 +38,19 @@ COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy the OpenOA repo (data + examples scripts only — no .git)
+# We need examples/project_ENGIE.py and examples/data
 COPY --from=builder /app/OpenOA_Repo/examples /app/OpenOA_Repo/examples
-COPY --from=builder /app/OpenOA_Repo/openoa /app/OpenOA_Repo/openoa
+# We don't need to copy 'openoa' folder if it was installed via pip install .
+# But let's keep the structure expected by main.py just in case data paths rely on it.
 COPY --from=builder /app/OpenOA_Repo/pyproject.toml /app/OpenOA_Repo/pyproject.toml
 
 # Copy our application code
 COPY main.py .
 COPY requirements.txt .
 
-EXPOSE 8000
+# Render uses port 10000 by default
+ENV PORT=10000
+EXPOSE 10000
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Added --forwarded-allow-ips '*' to trust Render proxy headers
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000} --forwarded-allow-ips '*'"]

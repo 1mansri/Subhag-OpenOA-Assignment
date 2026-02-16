@@ -38,9 +38,12 @@ try:
     import openoa
     from openoa.analysis import MonteCarloAEP
     HAS_OPENOA = True
-except ImportError:
+except Exception as e:
     HAS_OPENOA = False
-    print("⚠️ WARNING: OpenOA not found. The app will run in Simulation Mode.")
+    print(f"⚠️ WARNING: OpenOA import failed: {e}")
+    # traceback can be useful here
+    import traceback
+    traceback.print_exc()
 
 # --- Import the official ENGIE data loading script ---
 # The Dockerfile clones the OpenOA repo to /app/OpenOA_Repo
@@ -56,9 +59,11 @@ if os.path.exists(os.path.join(OPENOA_REPO_PATH, "examples")):
 try:
     import project_ENGIE
     HAS_ENGIE = True
-except ImportError:
+except Exception as e:
     HAS_ENGIE = False
-    print("⚠️ WARNING: project_ENGIE.py not found. Cannot load La Haute Borne data.")
+    print(f"⚠️ WARNING: project_ENGIE import failed: {e}")
+    import traceback
+    traceback.print_exc()
 
 app = FastAPI()
 
@@ -88,11 +93,18 @@ def run_analysis(request: AnalysisRequest):
     Main analysis endpoint.
     Uses the official project_ENGIE.prepare() function to load and clean data,
     then runs MonteCarloAEP analysis.
+    Memory-safe: uses gc.collect() between heavy operations and catches MemoryError.
     """
+    import gc
 
     if HAS_OPENOA and HAS_ENGIE and HAS_DATA:
+        plant = None
+        analysis = None
         try:
-            print("🚀 Starting OpenOA Real Analysis using project_ENGIE.prepare()...")
+            print("🚀 Starting OpenOA Real Analysis using project_ENGIE.prepare()...", flush=True)
+
+            # Force garbage collection before heavy operation
+            gc.collect()
 
             # Use the official ENGIE data loader
             plant = project_ENGIE.prepare(
@@ -101,15 +113,20 @@ def run_analysis(request: AnalysisRequest):
                 use_cleansed=False,
             )
 
-            print("✅ PlantData loaded successfully!")
-            print(f"   SCADA shape: {plant.scada.shape}")
-            print(f"   Turbines: {plant.asset.index.tolist()}")
+            print("✅ PlantData loaded successfully!", flush=True)
+            print(f"   SCADA shape: {plant.scada.shape}", flush=True)
+            print(f"   Turbines: {plant.asset.index.tolist()}", flush=True)
 
-            # Run Monte Carlo AEP analysis (limit simulations for speed)
+            # Free memory before analysis
+            gc.collect()
+
+            # Run Monte Carlo AEP analysis
+            # Use minimal simulations (5) to stay within Render free-tier RAM (512MB)
+            print("⏳ Running MonteCarloAEP (num_sim=5)...", flush=True)
             analysis = MonteCarloAEP(plant)
-            analysis.run(num_sim=20)
+            analysis.run(num_sim=5)
 
-            print("✅ MonteCarloAEP analysis complete!")
+            print("✅ MonteCarloAEP analysis complete!", flush=True)
 
             # Extract metrics
             aep_val = float(analysis.results["aep_GWh"].mean())
@@ -140,6 +157,11 @@ def run_analysis(request: AnalysisRequest):
             # Build chart data from real results
             chart_data = build_chart_data_from_plant(plant, analysis, aep_val)
 
+            # Clean up heavy objects before building response
+            del plant
+            del analysis
+            gc.collect()
+
             result = {
                 "status": "success",
                 "mode": "REAL_DATA",
@@ -150,11 +172,28 @@ def run_analysis(request: AnalysisRequest):
             }
             return JSONResponse(content=sanitize_floats(result))
 
+        except MemoryError:
+            print("❌ MemoryError: Not enough RAM for real analysis!", flush=True)
+            print("🔄 Falling back to Simulation Mode...", flush=True)
+            # Clean up whatever we can
+            del plant
+            del analysis
+            gc.collect()
+            plt.close("all")
+            return run_simulation_fallback("MemoryError: Server has insufficient RAM for full analysis")
+
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"❌ Real Analysis Failed: {e}")
-            print("🔄 Falling back to Simulation Mode...")
+            print(f"❌ Real Analysis Failed: {e}", flush=True)
+            print("🔄 Falling back to Simulation Mode...", flush=True)
+            # Clean up
+            if plant is not None:
+                del plant
+            if analysis is not None:
+                del analysis
+            gc.collect()
+            plt.close("all")
             return run_simulation_fallback(str(e))
     else:
         reasons = []
@@ -162,7 +201,7 @@ def run_analysis(request: AnalysisRequest):
         if not HAS_DATA: reasons.append(f"Data path missing: {DATA_PATH}")
         if not HAS_ENGIE: reasons.append("project_ENGIE.py not importable")
         msg = "; ".join(reasons)
-        print(f"⚠️ {msg}. Using Simulation.")
+        print(f"⚠️ {msg}. Using Simulation.", flush=True)
         return run_simulation_fallback(msg)
 
 
