@@ -64,13 +64,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://subhag-open-oa-assignment.vercel.app",
-        "https://www.subhag-open-oa-assignment.vercel.app",
-        "https://subhag-openoa-assignment.onrender.com",
-        "https://www.subhag-openoa-assignment.onrender.com"
-    ],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
