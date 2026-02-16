@@ -1,20 +1,35 @@
-# SUBHAG — Wind Energy Analysis Dashboard
+# SUBHAG — Wind Energy Analysis Dashboard 🌬️
 
 A full-stack application for wind energy analysis using the **OpenOA** (Open Operational Assessment) library. It runs Monte Carlo AEP (Annual Energy Production) simulations on the **La Haute Borne** wind farm dataset and visualizes the results through an interactive dashboard.
 
-| Layer    | Stack                                | Port   |
-| -------- | ------------------------------------ | ------ |
-| Frontend | Next.js 16, React 19, Recharts, pnpm | `3000` |
-| Backend  | FastAPI, Uvicorn, OpenOA, Matplotlib | `10000` |
+**Live Demo:** [https://subhag-open-oa-assignment.vercel.app/](https://subhag-open-oa-assignment.vercel.app/)  
+**Backend API:** [https://subhag-openoa-assignment.onrender.com](https://subhag-openoa-assignment.onrender.com)
+
+| Layer | Stack | Port |
+| :--- | :--- | :--- |
+| **Frontend** | Next.js 16, React 19, Recharts, Tailwind CSS | `3000` |
+| **Backend** | FastAPI, Uvicorn, OpenOA, Pandas, Matplotlib | `10000` |
+| **Infrastructure** | Docker, Render (Backend), Vercel (Frontend) | - |
+
+---
+
+## ⚠️ Architectural Decision: Cloud Resource Optimization
+
+**Why does the Live Demo use Pre-Computed Data?**
+
+The OpenOA `MonteCarloAEP` simulation is computationally intensive, requiring the processing of years of high-frequency SCADA data. This process typically consumes **>1GB of RAM**, which exceeds the strict **512MB RAM limit** of the Render Free Tier.
+
+To ensure stability and prevent Out-Of-Memory (OOM) crashes in the production environment, we implemented a **Pre-Computation Strategy**:
+1.  **Production (Render):** Serves validated, pre-calculated analysis results derived from the La Haute Borne dataset. This ensures instant response times and zero server crashes.
+2.  **Development (Local):** Runs the full, real-time Monte Carlo simulation logic.
 
 ---
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Run Locally (without Docker)](#run-locally-without-docker)
+- [Run Locally (Full Analysis Mode)](#run-locally-full-analysis-mode)
 - [Run with Docker](#run-with-docker)
-- [Environment Variables](#environment-variables)
 - [Project Structure](#project-structure)
 - [OpenOA Library — How It Works](#openoa-library--how-it-works)
 
@@ -22,55 +37,57 @@ A full-stack application for wind energy analysis using the **OpenOA** (Open Ope
 
 ## Prerequisites
 
-| Tool    | Version  | Required For |
-| ------- | -------- | ------------ |
-| Node.js | ≥ 20     | Frontend     |
-| pnpm    | ≥ 9      | Frontend     |
-| Python  | ≥ 3.10   | Backend      |
-| Docker  | ≥ 24     | Docker setup |
-| Git     | Any      | Both         |
+| Tool | Version | Required For |
+| :--- | :--- | :--- |
+| Node.js | ≥ 20 | Frontend |
+| pnpm | ≥ 9 | Frontend |
+| Python | ≥ 3.10 | Backend |
+| Docker | ≥ 24 | Containerization |
+| Git | Any | Version Control |
 
 ---
 
-## Run Locally (without Docker)
+## Run Locally (Full Analysis Mode)
+
+Running locally allows you to witness the **actual OpenOA library** performing live calculations on your machine.
 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/1mansri/Subhag-OpenOA-Assignment
+git clone [https://github.com/1mansri/Subhag-OpenOA-Assignment](https://github.com/1mansri/Subhag-OpenOA-Assignment)
 cd Subhag-OpenOA-Assignment
+
 ```
 
-### 2. Backend
+### 2. Backend Setup
 
 ```bash
 # Navigate to backend
 cd backend
 
-# (Recommended) Create a virtual environment
+# Create and activate virtual environment
 python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
+# Windows: venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Run the automated setup script
-# (Clones OpenOA repo, extracts dataset, installs OpenOA — works on all platforms)
+# (Clones OpenOA repo, extracts dataset, installs OpenOA)
 python setup_data.py
 
 # Start the server
 uvicorn main:app --host 0.0.0.0 --port 10000 --reload
+
 ```
 
 The backend will be available at **http://localhost:10000**.
 
 > [!NOTE]
-> If OpenOA or its data is not available, the backend automatically falls back to **Simulation Mode** and generates synthetic results.
+> If the OpenOA library or data is missing, the system will automatically fall back to **Simulation Mode** (synthetic data) to prevent crashes.
 
-### 3. Frontend
+### 3. Frontend Setup
 
 ```bash
 # Navigate to frontend (from project root)
@@ -79,11 +96,12 @@ cd frontend
 # Install dependencies
 pnpm install
 
-# Create .env file (if not already present)
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env
+# Create .env file
+echo "NEXT_PUBLIC_API_URL=http://localhost:10000" > .env
 
 # Start the dev server
 pnpm dev
+
 ```
 
 The frontend will be available at **http://localhost:3000**.
@@ -92,100 +110,32 @@ The frontend will be available at **http://localhost:3000**.
 
 ## Run with Docker
 
-### Build & Run Backend
+### Option A: Run Both (Quick Start)
 
 ```bash
-cd backend
-docker build -t subhag-backend .
-docker run -d -p 10000:10000 --name subhag-backend subhag-backend
-```
-
-> The backend Dockerfile uses a **multi-stage build** with shallow git clone, `.git` removal, and `--no-cache-dir` to minimize the final image size.
-
-### Build & Run Frontend
-
-```bash
-cd frontend
-docker build -t subhag-frontend .
-docker run -d -p 3000:3000 --name subhag-frontend subhag-frontend
-```
-
-### Run Both Together (quick commands)
-
-```bash
-# From project root — build both
+# From project root
 docker build -t subhag-backend ./backend
 docker build -t subhag-frontend ./frontend
 
-# Run both
 docker run -d -p 10000:10000 --name subhag-backend subhag-backend
 docker run -d -p 3000:3000 --name subhag-frontend subhag-frontend
+
 ```
 
-### Stop & Remove Containers
+### Option B: Backend Optimization Details
 
-```bash
-docker stop subhag-backend subhag-frontend
-docker rm subhag-backend subhag-frontend
-```
+The backend Dockerfile uses a **multi-stage build** to optimize for size:
 
-### Viewing Logs
+1. **Builder Stage:** Installs full OpenOA stack (numpy, pandas, etc.) and performs the heavy installation.
+2. **Runner Stage:** Copies only the necessary artifacts.
+3. **Result:** Final image size is reduced from >2GB to **~750MB**, making it suitable for free-tier deployments.
 
-If you run with `-d` (detached), you can view logs with:
+To view logs:
+
 ```bash
 docker logs -f subhag-backend
+
 ```
-
-To run in the foreground (to see logs immediately):
-```bash
-# Backend
-docker run -p 10000:10000 --name subhag-backend subhag-backend
-
-# Frontend
-docker run -p 3000:3000 --name subhag-frontend subhag-frontend
-```
-
-> [!TIP]
-> The backend Docker image uses a **source-bundle build** that patches OpenOA to separate it from heavy unused dependencies (bokeh, ipython, jupyterlab). The final image is **~600–750 MB** — suitable for free-tier platforms like Render.
-
----
-
-## Environment Variables
-
-### Frontend (`frontend/.env`)
-
-| Variable              | Default                  | Description                  |
-| --------------------- | ------------------------ | ---------------------------- |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:10000`  | Backend API base URL         |
-
-### Backend
-
-No `.env` file is required. Configuration is handled through the Dockerfile and the OpenOA data path constants in `main.py`.
-
----
-
-## Deploy to Render (Free Tier)
-
-This backend is optimized to run on **Render's Free Tier** (512 MB RAM, < 1GB image).
-
-1. Push this repo to GitHub.
-2. Go to [render.com](https://render.com) → **New** → **Web Service**.
-3. Connect your GitHub repo and select the **backend** directory.
-4. Settings:
-   - **Root Directory**: `backend`
-   - **Runtime**: Docker
-   - **Instance Type**: Free
-5. Render will auto-detect the `Dockerfile` and build the image.
-6. Set the frontend's `NEXT_PUBLIC_API_URL` to the Render-provided URL.
-
-> [!IMPORTANT]
-> **Static Mode (Pre-computed)**: To run efficiently on free-tier hosting (512MB RAM), the Docker image uses a **multi-stage build**.
-> 1. **Builder Stage**: Installs the full OpenOA stack (numpy, pandas, etc.) and runs the heavy Monte Carlo analysis *during the build*.
-> 2. **Runner Stage**: Discards all heavy libraries and copies only the **pre-computed `results.json`** and a lightweight FastAPI server.
->
-> **Result**: The runtime image is tiny (~150MB) and uses negligible RAM (~50MB), serving instant results. The frontend displays this as **"OpenOA (Pre-computed)"** status.
-
-
 
 ---
 
@@ -193,30 +143,20 @@ This backend is optimized to run on **Render's Free Tier** (512 MB RAM, < 1GB im
 
 ```
 SUBHAG/
-├── README.md                    # This file
+├── README.md                    # Documentation
 ├── backend/
 │   ├── Dockerfile               # Multi-stage optimized build
-│   ├── .dockerignore
-│   ├── .gitignore
-│   ├── main.py                  # FastAPI server with OpenOA analysis
+│   ├── main.py                  # FastAPI server & Analysis Logic
 │   ├── setup_data.py            # Automated data setup script
-│   └── requirements.txt         # Python dependencies
+│   ├── requirements.txt         # Python dependencies
+│   └── data/                    # (Generated) Local storage for OpenOA data
 └── frontend/
-    ├── Dockerfile               # Multi-stage Next.js build
-    ├── .dockerignore
-    ├── .gitignore
-    ├── .env                     # API URL configuration
-    ├── package.json
-    ├── next.config.ts           # standalone output for Docker
-    ├── app/                     # Next.js app router pages
+    ├── Dockerfile               # Next.js build
+    ├── app/                     # Next.js App Router
     └── components/
-        ├── analysis-dashboard.tsx   # Main dashboard (data fetching)
-        ├── section-cards.tsx        # Summary metric cards
-        └── charts/                  # Recharts visualizations
-            ├── power-curve-chart.tsx
-            ├── monthly-production-chart.tsx
-            ├── aep-distribution-chart.tsx
-            └── turbine-comparison-chart.tsx
+        ├── analysis-dashboard.tsx   # Main Interface
+        └── charts/                  # Recharts Visualizations
+
 ```
 
 ---
@@ -225,75 +165,43 @@ SUBHAG/
 
 ### What is OpenOA?
 
-[OpenOA](https://github.com/NREL/OpenOA) (Open Operational Assessment) is an open-source Python library developed by the **National Renewable Energy Laboratory (NREL)**. It provides a standardized framework for assessing the performance of operational wind farms.
+[OpenOA](https://github.com/NREL/OpenOA) (Open Operational Assessment) is an open-source Python library developed by **NREL**. It provides a standardized framework for assessing wind farm performance.
 
-This project uses a community fork at `https://github.com/NatLabRockies/OpenOA` which includes the **La Haute Borne** sample dataset.
+### The Data Pipeline (Local/Live Mode)
 
-### How Data is Fetched
+When running locally, the application executes the full scientific pipeline:
 
-The data pipeline works in three stages:
+1. **Data Ingestion**: The backend extracts the **La Haute Borne** SCADA dataset (bundled as a ZIP in the OpenOA repo).
+2. **Data Cleaning**: It uses `project_ENGIE.prepare()` to clean and normalize raw 10-minute interval turbine readings.
+3. **Monte Carlo Simulation**:
+```python
+# Actual code running in backend/main.py (Local Mode)
+analysis = MonteCarloAEP(plant)
+analysis.run(num_sim=20)
 
-1. **Data Source**: The La Haute Borne wind farm SCADA dataset is bundled as a ZIP file inside the OpenOA repo at `examples/data/la_haute_borne.zip`. The Dockerfile unzips it during the image build.
+```
 
-2. **Data Loading**: The backend uses the official `project_ENGIE.prepare()` function (from the OpenOA repo's `examples/project_ENGIE.py`) to load and clean the raw CSV data into OpenOA's `PlantData` object:
-   ```python
-   plant = project_ENGIE.prepare(
-       path=DATA_PATH,
-       return_value="plantdata",
-       use_cleansed=False,
-   )
-   ```
-   This creates a structured object containing:
-   - **SCADA data**: 10-minute interval turbine readings (wind speed, power output, etc.)
-   - **Asset metadata**: Turbine specifications (rated power, location, etc.)
 
-3. **Analysis**: The `MonteCarloAEP` analysis is run on the `PlantData`:
-   ```python
-   analysis = MonteCarloAEP(plant)
-   analysis.run(num_sim=20)
-   ```
-   This performs 20 Monte Carlo simulations to estimate the Annual Energy Production with uncertainty bounds.
+This performs 20 iterations of Monte Carlo simulations to calculate the P50 AEP (Annual Energy Production) and uncertainty bounds.
 
-### How Data is Displayed
+### Edge Case Handling
 
-The backend extracts four data streams from the analysis results and sends them to the frontend as JSON:
+The system is designed for resilience across different environments:
 
-| Chart                    | Data Source                             | Frontend Component                 |
-| ------------------------ | --------------------------------------- | ---------------------------------- |
-| **Power Curve**          | SCADA wind speed vs. power output, binned at 0.5 m/s intervals | `PowerCurveChart` (line chart)     |
-| **Monthly Production**   | SCADA energy output aggregated by month | `MonthlyProductionChart` (bar chart) |
-| **AEP Distribution**     | Histogram of Monte Carlo AEP samples    | `AEPDistributionChart` (bar chart) |
-| **Turbine Comparison**   | Per-turbine capacity factor & availability | `TurbineComparisonChart` (bar chart) |
+| Scenario | System Behavior |
+| --- | --- |
+| **Local / High RAM** | Runs full **Live Analysis** using OpenOA. |
+| **Cloud / Low RAM** | Serves **Pre-Computed** validated results to avoid OOM kills. |
+| **Missing Library** | Falls back to **Simulation Mode** (Synthetic Data) with a warning. |
+| **Backend Offline** | Frontend shows "Disconnected" badge and disables analysis. |
 
-Additionally, a **matplotlib plot** is rendered server-side, encoded as a base64 PNG, and displayed in the "Backend Plot Output" card.
+---
 
-### Edge Cases & Fallbacks
+### Deployment
 
-The backend is designed to be resilient. Here are the edge cases it handles:
+To deploy on **Render (Free Tier)**:
 
-1. **OpenOA Not Installed** (`HAS_OPENOA = False`):
-   - If the `openoa` package cannot be imported (e.g., running locally without installing it), the app detects this at startup and prints a warning.
-   - All `/analyze` requests fall back to **Simulation Mode**, returning synthetic data.
-
-2. **Dataset Not Found** (`HAS_DATA = False`):
-   - If the data directory (`examples/data/la_haute_borne/`) does not exist (e.g., ZIP not extracted), the app falls back to simulation.
-
-3. **ENGIE Loader Missing** (`HAS_ENGIE = False`):
-   - If `project_ENGIE.py` cannot be imported from the OpenOA repo's `examples/` directory, simulation mode is used.
-
-4. **Analysis Runtime Failure**:
-   - If `MonteCarloAEP.run()` or data extraction throws any exception, it is caught, logged with a traceback, and the response falls back to `run_simulation_fallback()` with the error message included in `debug_note`.
-
-5. **NaN / Infinity in Results**:
-   - Scientific computations can produce `NaN` or `Inf` values which break JSON serialization. The `sanitize_floats()` function recursively walks the entire response and replaces any `NaN`/`Inf` with `0`.
-
-6. **Missing SCADA Columns**:
-   - Column names vary between datasets. The backend dynamically searches for columns containing keywords like `ws`, `windspeed`, `p_avg`, `wtur_w`, `power`, `energy`, `time`, `date` — rather than hardcoding column names.
-   - If a required column is not found, that specific chart section (e.g., power curve) is returned as an empty array and the frontend conditionally hides the chart.
-
-7. **Frontend Disconnected**:
-   - The frontend performs a health check to `GET /` every 30 seconds. If the backend is unreachable, the connection status badge shows "Disconnected" and an error card is displayed when analysis is attempted.
-   - Chart components are conditionally rendered only when `data.chart_data?.power_curve?.length > 0`, preventing crashes on empty arrays.
-
-8. **Simulation Mode Indicator**:
-   - When simulation data is returned, the response includes `"mode": "SIMULATION_FALLBACK"` and the `debug_note` field, which the frontend displays as a warning banner so users know they are viewing synthetic data.
+1. Connect your GitHub repo.
+2. Select **Docker** Runtime.
+3. The `Dockerfile` automatically detects the environment and ensures the lightweight server is built.
+4. Set `NEXT_PUBLIC_API_URL` in your Vercel/Frontend project to the Render backend URL.
