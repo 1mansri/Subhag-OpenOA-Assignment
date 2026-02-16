@@ -143,7 +143,7 @@ export function SectionCards({ data, isConnected }: SectionCardsProps) {
                         )}
                     </div>
                     <div className="text-muted-foreground">
-                        {data?.mode === "REAL_DATA"
+                        {data?.mode?.includes("REAL_DATA")
                             ? "OpenOA real data mode"
                             : data?.mode === "SIMULATION_FALLBACK"
                                 ? "Simulation fallback mode"

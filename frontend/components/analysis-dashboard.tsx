@@ -34,7 +34,9 @@ export function AnalysisDashboard() {
                 const res = await fetch(API_BASE, { cache: "no-store" })
                 if (!res.ok) throw new Error()
                 const health: HealthResponse = await res.json()
-                setIsConnected(health.library_installed)
+                // Check if library is installed OR if running in pre-computed static mode
+                const isPreComputed = health.engine?.includes("Pre-computed") || health.status?.includes("Static Mode")
+                setIsConnected(health.library_installed || isPreComputed)
             } catch {
                 setIsConnected(false)
             }

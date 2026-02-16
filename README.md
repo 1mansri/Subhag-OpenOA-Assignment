@@ -178,8 +178,12 @@ This backend is optimized to run on **Render's Free Tier** (512 MB RAM, < 1GB im
 5. Render will auto-detect the `Dockerfile` and build the image.
 6. Set the frontend's `NEXT_PUBLIC_API_URL` to the Render-provided URL.
 
-> [!NOTE]
-> **Disk vs RAM**: The ~1GB image size is stored on disk (not RAM). The runtime memory usage stays around **200–300 MB**, fitting comfortably within Render's 512 MB free-tier limit. The analysis uses `num_sim=5` to minimize memory spikes.
+> [!IMPORTANT]
+> **Static Mode (Pre-computed)**: To run efficiently on free-tier hosting (512MB RAM), the Docker image uses a **multi-stage build**.
+> 1. **Builder Stage**: Installs the full OpenOA stack (numpy, pandas, etc.) and runs the heavy Monte Carlo analysis *during the build*.
+> 2. **Runner Stage**: Discards all heavy libraries and copies only the **pre-computed `results.json`** and a lightweight FastAPI server.
+>
+> **Result**: The runtime image is tiny (~150MB) and uses negligible RAM (~50MB), serving instant results. The frontend displays this as **"OpenOA (Pre-computed)"** status.
 
 
 
