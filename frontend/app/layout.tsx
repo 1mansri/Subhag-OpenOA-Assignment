@@ -1,11 +1,8 @@
 import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
-import "./globals.css"
-
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import "./globals.css"
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,27 +26,19 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <meta name="apple-mobile-web-app-title" content="OpenOA Analysis Dashboard" />
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <TooltipProvider>
-          <SidebarProvider
-            defaultOpen={true}
-            style={
-              {
-                "--sidebar-width": "calc(var(--spacing) * 72)",
-              } as React.CSSProperties
-            }
-          >
-            <AppSidebar />
-            <SidebarInset>
-              <SiteHeader />
-              <div className="flex flex-1 flex-col">{children}</div>
-            </SidebarInset>
-          </SidebarProvider>
-        </TooltipProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <TooltipProvider>{children}</TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

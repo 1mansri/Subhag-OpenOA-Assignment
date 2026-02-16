@@ -1,3 +1,5 @@
+import Link from "next/link"
+import { Home } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
@@ -6,13 +8,15 @@ import {
     BreadcrumbList,
     BreadcrumbPage,
     BreadcrumbSeparator,
+    BreadcrumbLink,
 } from "@/components/ui/breadcrumb"
 import { StatusBadge } from "@/components/status-badge"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ModeToggle } from "@/components/mode-toggle"
+import { Button } from "@/components/ui/button"
 
 export function SiteHeader() {
     return (
-        <header className="bg-background rounded-t-lg sticky top-0 z-50 flex w-full items-center border-b">
+        <header className="bg-background rounded-t-lg sticky top-0 z-50 flex w-full items-center border-b backdrop-blur supports-[backdrop-filter]:bg-background/95">
             <div className="flex h-14 w-full items-center gap-2 px-4 lg:px-6">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
@@ -22,7 +26,11 @@ export function SiteHeader() {
                 <Breadcrumb className="hidden sm:flex">
                     <BreadcrumbList>
                         <BreadcrumbItem>
-                            <span className="text-muted-foreground text-sm">OpenOA Cloud</span>
+                            <BreadcrumbLink asChild>
+                                <Link href="/" className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+                                    OpenOA Cloud
+                                </Link>
+                            </BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
@@ -32,9 +40,20 @@ export function SiteHeader() {
                         </BreadcrumbItem>
                     </BreadcrumbList>
                 </Breadcrumb>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    asChild 
+                    className="sm:hidden"
+                >
+                    <Link href="/">
+                        <Home className="h-4 w-4" />
+                        <span className="sr-only">Home</span>
+                    </Link>
+                </Button>
                 <div className="ml-auto flex items-center gap-2">
                     <StatusBadge />
-                    <ThemeToggle />
+                    <ModeToggle />
                 </div>
             </div>
         </header>
