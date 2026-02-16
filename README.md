@@ -1,4 +1,4 @@
-# SUBHAG — Wind Energy Analysis Dashboard 🌬️
+# SUBHAG — Wind Energy Analysis Dashboard 
 
 A full-stack application for wind energy analysis using the **OpenOA** (Open Operational Assessment) library. It runs Monte Carlo AEP (Annual Energy Production) simulations on the **La Haute Borne** wind farm dataset and visualizes the results through an interactive dashboard.
 
