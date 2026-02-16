@@ -63,10 +63,29 @@ def main():
         print("  The repository may have changed. Please check manually.")
         sys.exit(1)
 
+    # ── Step 2.5: Remove .git folder to save space ────────────────
+    git_dir = os.path.join(REPO_DIR, ".git")
+    if os.path.exists(git_dir):
+        print(f"\n[2.5/3] Removing .git folder to save space...")
+        try:
+            import shutil
+            # Change permission for read-only files (common in .git)
+            def on_error(func, path, exc_info):
+                import stat
+                if not os.access(path, os.W_OK):
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                else:
+                    raise
+            shutil.rmtree(git_dir, onerror=on_error)
+            print("  ✓ .git folder removed.")
+        except Exception as e:
+            print(f"  ⚠️ Could not remove .git folder: {e}")
+
     # ── Step 3: Install OpenOA ────────────────────────────────
     print(f"\n[3/3] Installing OpenOA with example dependencies...")
     print("  (This may take a few minutes on first run)\n")
-    run([sys.executable, "-m", "pip", "install", "--default-timeout=300", ".[examples]"], cwd=REPO_DIR)
+    run([sys.executable, "-m", "pip", "install", "--default-timeout=300", "."], cwd=REPO_DIR)
 
     # ── Done ──────────────────────────────────────────────────
     print("\n" + "=" * 60)
