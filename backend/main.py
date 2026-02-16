@@ -34,6 +34,14 @@ def sanitize_floats(obj):
     return obj
 
 # --- IMPORT OPENOA SAFELY ---
+# NOTE: The Docker build uses a "source bundle" approach — OpenOA is installed
+# with --no-deps, and only required dependencies are manually installed.
+# Three source files are patched to lazy-import unused heavy deps:
+#   - openoa/utils/plot.py       → bokeh (try/except)
+#   - openoa/plant.py            → IPython.display (try/except)
+#   - openoa/utils/metadata_fetch.py → eia (try/except)
+# This saves ~460MB by skipping bokeh, IPython, ipywidgets, eia-python,
+# jupyterlab, xarray, netcdf4, h5py, etc.
 try:
     import openoa
     from openoa.analysis import MonteCarloAEP
@@ -41,7 +49,6 @@ try:
 except Exception as e:
     HAS_OPENOA = False
     print(f"⚠️ WARNING: OpenOA import failed: {e}")
-    # traceback can be useful here
     import traceback
     traceback.print_exc()
 

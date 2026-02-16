@@ -97,7 +97,7 @@ The frontend will be available at **http://localhost:3000**.
 ```bash
 cd backend
 docker build -t subhag-backend .
-docker run -d -p 8000:8000 --name subhag-backend subhag-backend
+docker run -d -p 10000:10000 --name subhag-backend subhag-backend
 ```
 
 > The backend Dockerfile uses a **multi-stage build** with shallow git clone, `.git` removal, and `--no-cache-dir` to minimize the final image size.
@@ -118,7 +118,7 @@ docker build -t subhag-backend ./backend
 docker build -t subhag-frontend ./frontend
 
 # Run both
-docker run -d -p 8000:8000 --name subhag-backend subhag-backend
+docker run -d -p 10000:10000 --name subhag-backend subhag-backend
 docker run -d -p 3000:3000 --name subhag-frontend subhag-frontend
 ```
 
@@ -139,14 +139,14 @@ docker logs -f subhag-backend
 To run in the foreground (to see logs immediately):
 ```bash
 # Backend
-docker run -p 8000:8000 --name subhag-backend subhag-backend
+docker run -p 10000:10000 --name subhag-backend subhag-backend
 
 # Frontend
 docker run -p 3000:3000 --name subhag-frontend subhag-frontend
 ```
 
 > [!TIP]
-> The backend Docker build installs large scientific Python dependencies (NumPy, Pandas, Matplotlib) and processes the dataset. The first build may take several minutes and result in a large image (~1.5 GB), but subsequent builds will be faster due to layer caching.
+> The backend Docker image uses a **source-bundle build** that patches OpenOA to separate it from heavy unused dependencies (bokeh, ipython, jupyterlab). The final image is **~600–750 MB** — suitable for free-tier platforms like Render.
 
 ---
 
@@ -161,6 +161,27 @@ docker run -p 3000:3000 --name subhag-frontend subhag-frontend
 ### Backend
 
 No `.env` file is required. Configuration is handled through the Dockerfile and the OpenOA data path constants in `main.py`.
+
+---
+
+## Deploy to Render (Free Tier)
+
+This backend is optimized to run on **Render's Free Tier** (512 MB RAM, < 1GB image).
+
+1. Push this repo to GitHub.
+2. Go to [render.com](https://render.com) → **New** → **Web Service**.
+3. Connect your GitHub repo and select the **backend** directory.
+4. Settings:
+   - **Root Directory**: `backend`
+   - **Runtime**: Docker
+   - **Instance Type**: Free
+5. Render will auto-detect the `Dockerfile` and build the image.
+6. Set the frontend's `NEXT_PUBLIC_API_URL` to the Render-provided URL.
+
+> [!NOTE]
+> The backend uses a **source-bundle approach** (patches OpenOA to skip heavy unused deps like bokeh/jupyter) to keep the image size under 800 MB. The analysis runs "live" (using `num_sim=5`) to stay within the 512 MB RAM limit.
+
+
 
 ---
 
